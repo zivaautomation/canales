@@ -241,8 +241,9 @@ function enter(){ store.set("pat", PAT); show(); handleCallback(); load(); }
 $("showSetup").onclick = e => { e.preventDefault(); $("setupBox").hidden = false; $("pwBox").hidden = true; };
 $("pw").onkeydown = e => { if (e.key === "Enter") $("pwBtn").click(); };
 $("pwBtn").onclick = async () => {
-  try { let j = null; const loc = store.get("acceso"); if (loc) j = JSON.parse(loc);
-    if (!j) { const r = await fetch("acceso.json?t=" + Date.now()); if (!r.ok) throw new Error("Todavía no hay contraseña en este dispositivo: usá “Primera vez”."); j = await r.json(); } const key = await kdf($("pw").value, u8(j.salt));
+  try { let j = null; const r = await fetch("acceso.json?t=" + Date.now());
+    if (r.ok) j = await r.json(); else { const loc = store.get("acceso"); if (loc) j = JSON.parse(loc); }
+    if (!j) throw new Error("Todavía no hay contraseña: usá “Primera vez”."); const key = await kdf($("pw").value, u8(j.salt));
     PAT = new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM", iv:u8(j.iv)}, key, u8(j.data))); enter(); }
   catch(e){ toast(e.name === "OperationError" ? "Contraseña incorrecta" : e.message, 6000); }
 };
