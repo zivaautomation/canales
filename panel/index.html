@@ -49,7 +49,7 @@ input[type=time]{width:105px}textarea{width:100%;min-height:80px;font-family:ui-
   </div>
   <div id="setupBox" hidden>
     <p class="mut">Solo la primera vez: pegá el token de GitHub (repos <b>social-publisher</b> y <b>canales</b>; permisos Contents, Actions, Secrets y Variables en <i>Read and write</i>) y elegí una contraseña. Después entrás desde cualquier dispositivo solo con la contraseña.</p>
-    <input id="pat" type="password" placeholder="github_pat_…" style="width:100%;margin-bottom:8px">
+    <input id="pat" type="text" autocomplete="off" spellcheck="false" placeholder="github_pat_…" style="width:100%;margin-bottom:8px">
     <input id="newPw" type="password" placeholder="Contraseña nueva (mínimo 8 caracteres)" style="width:100%;margin-bottom:8px">
     <input id="newPw2" type="password" placeholder="Repetir contraseña" style="width:100%">
     <p><button class="btn" id="setupBtn">Guardar y entrar</button></p>
@@ -246,7 +246,10 @@ $("pwBtn").onclick = async () => {
 };
 $("setupBtn").onclick = async () => {
   const pat = $("pat").value.trim(), pw = $("newPw").value;
-  if (!pat) return toast("Pegá el token"); if (pw.length < 8) return toast("La contraseña debe tener al menos 8 caracteres");
+  if (!pat) return toast("Pegá el token");
+  if (!/^(github_pat_|ghp_)[A-Za-z0-9_]{20,}$/.test(pat)) return toast("Eso no parece un token de GitHub: tiene que empezar con github_pat_", 7000);
+  const who = await fetch("https://api.github.com/user", {headers:{"Authorization":"Bearer "+pat}});
+  if (who.status === 401) return toast("GitHub dice que el token no es válido (copiado incompleto, vencido o regenerado). Creá uno nuevo y copialo entero.", 9000); if (pw.length < 8) return toast("La contraseña debe tener al menos 8 caracteres");
   if (pw !== $("newPw2").value) return toast("Las contraseñas no coinciden");
   try { const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
     const data = await crypto.subtle.encrypt({name:"AES-GCM", iv}, await kdf(pw, salt), new TextEncoder().encode(pat));
