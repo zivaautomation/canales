@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Panel · Publicador</title>
+<style>
+:root{--bg:#020607;--card:#0b1410;--line:#1D2C17;--txt:#EDE9C8;--mut:#9aa38a;--acc:#7CC24A;--acc2:#2DEF1E;--lime:#CFE18E;--err:#ff6b6b;--blue:#192761}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--line);gap:12px;flex-wrap:wrap}
+h1{font-size:19px;margin:0;color:var(--lime)}h2{font-size:16px;margin:0 0 10px}
+main{max-width:1100px;margin:0 auto;padding:20px}
+.btn{background:var(--acc);color:#020607;border:0;border-radius:10px;padding:10px 16px;font-weight:700;cursor:pointer;font-size:14px}
+.btn:hover{background:var(--acc2)}.btn.big{padding:14px 26px;font-size:16px}
+.btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}.btn.ghost:hover{border-color:var(--acc)}
+.btn:disabled{opacity:.5;cursor:wait}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.bar{height:10px;background:#142113;border-radius:6px;overflow:hidden;margin:8px 0}.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2))}
+.big-pct{font-size:30px;font-weight:800;color:var(--lime)}
+.mut{color:var(--mut);font-size:13px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pill{font-size:12px;padding:2px 8px;border-radius:20px;border:1px solid var(--line)}.ok{color:var(--acc2);border-color:#2d5a22}.no{color:var(--err);border-color:#5a2222}
+input,textarea,select{background:#020A09;color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit}
+input[type=time]{width:105px}textarea{width:100%;min-height:80px;font-family:ui-monospace,monospace;font-size:12px}
+.sec{margin-top:26px}details.card summary{cursor:pointer;font-weight:700}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--blue);padding:12px 18px;border-radius:10px;display:none;max-width:90vw}
+.err{color:var(--err);font-size:12px;word-break:break-word}
+#login{max-width:520px;margin:60px auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>Publicador · IG Reels + YouTube Shorts</h1>
+  <div class="row" id="topbtns" hidden>
+    <button class="btn big" id="nowAll">⚡ SUBIR YA · TODAS</button>
+    <button class="btn ghost" id="refresh">↻</button>
+    <button class="btn ghost" id="logout">Salir</button>
+  </div>
+</header>
+
+<main>
+<section id="login" class="card" hidden>
+  <h2>Entrar</h2>
+  <p class="mut">Pegá tu token de GitHub (fine-grained, repo <b>zivaautomation/social-publisher</b>, permisos: Contents, Actions, Secrets y Variables en <i>Read and write</i>). Se guarda solo en este navegador.</p>
+  <input id="pat" type="password" placeholder="github_pat_…" style="width:100%">
+  <p><button class="btn" id="loginBtn">Entrar</button></p>
+  <p class="mut"><a style="color:var(--lime)" target="_blank" href="https://github.com/settings/personal-access-tokens/new">Crear token →</a></p>
+</section>
+
+<div id="app" hidden>
+  <section>
+    <div class="row" style="justify-content:space-between"><h2>Progreso</h2><span class="mut" id="updated"></span></div>
+    <div class="card" style="margin-bottom:14px"><div class="row" style="justify-content:space-between"><span>Total publicado</span><span class="big-pct" id="totPct">0%</span></div><div class="bar"><i id="totBar" style="width:0"></i></div><span class="mut" id="totTxt"></span></div>
+    <div class="grid" id="cards"></div>
+  </section>
+
+  <section class="sec card">
+    <h2>Horarios (hora Argentina)</h2>
+    <p class="mut">Cada cuenta publica 1 video en cada horario. “Subir ya” no consume ni pausa estos horarios.</p>
+    <div class="row"><b>Todas:</b> <span id="globalSlots"></span>
+      <label class="mut"><input type="checkbox" id="stagger" checked> escalonar +10 min por cuenta</label>
+      <button class="btn ghost" id="applyAll">Aplicar a todas</button></div>
+    <div id="slotRows" style="margin-top:12px"></div>
+    <p><button class="btn" id="saveSlots">Guardar horarios</button></p>
+  </section>
+
+  <section class="sec">
+    <h2>Conexiones</h2>
+    <details class="card"><summary>1 · Google Drive</summary>
+      <p class="mut">Pegá el JSON de la cuenta de servicio (el archivo que descargaste de Google Cloud). Después compartí la carpeta de Drive con el email que aparece abajo como <b>Editor</b>, y pegá el link de la carpeta. Adentro va una carpeta por cuenta: <code>relatosexpress</code>, <code>tirofinal</code>, <code>purapelota</code>, <code>ggclips</code> (cada una con <code>pendientes</code>; el resto se crea solo).</p>
+      <textarea id="saJson" placeholder='{"type":"service_account", ...}'></textarea>
+      <p class="row"><button class="btn" id="saveSa">Guardar cuenta de servicio</button><span class="mut" id="saEmail"></span></p>
+      <p class="row"><input id="driveLink" placeholder="https://drive.google.com/drive/folders/…" style="flex:1"><button class="btn" id="saveDrive">Guardar carpeta</button></p>
+      <p class="mut" id="driveNow"></p>
+    </details>
+    <details class="card" style="margin-top:10px"><summary>2 · Clave de cifrado (una sola vez)</summary>
+      <p class="mut">Protege los tokens de las cuentas. Generala una vez; si la regenerás tenés que reconectar todo.</p>
+      <button class="btn" id="genKey">Generar y guardar clave</button> <span class="mut" id="keyState"></span>
+    </details>
+    <details class="card" style="margin-top:10px"><summary>3 · Instagram (app de Meta)</summary>
+      <p class="mut">Del panel de Meta Developers → tu app → Instagram → “API setup with Instagram login”: copiá el <b>Instagram app ID</b> y el <b>Instagram app secret</b>. Redirect URI a cargar allá: <code id="ruri1"></code></p>
+      <p class="row"><input id="igId" placeholder="Instagram app ID"><input id="igSecret" type="password" placeholder="Instagram app secret"><button class="btn" id="saveIg">Guardar</button></p>
+    </details>
+    <details class="card" style="margin-top:10px"><summary>4 · YouTube (un cliente OAuth por canal)</summary>
+      <p class="mut">Pegá el JSON del cliente OAuth (tipo “Aplicación web”) de cada proyecto. Redirect URI autorizado: <code id="ruri2"></code></p>
+      <div id="ytClients"></div>
+    </details>
+    <details class="card" style="margin-top:10px"><summary>5 · Opciones</summary>
+      <p class="row"><label><input type="checkbox" id="audited"> YouTube ya auditado (publicar en <b>público</b>; si no, se sube como privado)</label><button class="btn ghost" id="saveAud">Guardar</button></p>
+      <p class="mut"><a style="color:var(--lime)" target="_blank" href="https://github.com/zivaautomation/social-publisher/actions">Ver ejecuciones en GitHub →</a></p>
+    </details>
+  </section>
+
+  <section class="sec card"><h2>Últimas ejecuciones</h2><div id="runs" class="mut"></div></section>
+</div>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const REPO = "zivaautomation/social-publisher";
+const REDIRECT = location.origin + location.pathname;
+const API = "https://api.github.com";
+const store = {get(k){try{return localStorage.getItem(k)}catch(e){return null}},set(k,v){try{localStorage.setItem(k,v)}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+let PAT = store.get("pat"), CFG = null, CFG_SHA = null, STATUS = null;
+const $ = id => document.getElementById(id);
+const toast = (m, ms=4000) => { const t=$("toast"); t.textContent=m; t.style.display="block"; clearTimeout(t._h); t._h=setTimeout(()=>t.style.display="none", ms); };
+const b64d = s => decodeURIComponent(escape(atob(s.replace(/\n/g,""))));
+const b64e = s => btoa(unescape(encodeURIComponent(s)));
+
+async function gh(path, opt={}) {
+  const r = await fetch(API + path, {...opt, headers: {"Authorization": "Bearer " + PAT, "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...(opt.headers||{})}});
+  if (r.status === 401) { logout(); throw new Error("Token inválido"); }
+  if (!r.ok && r.status !== 404) throw new Error(`${r.status}: ${(await r.text()).slice(0,200)}`);
+  if (r.status === 404) return null;
+  const t = await r.text(); try { return t ? JSON.parse(t) : {}; } catch(e){ return {}; }
+}
+async function readFile(p){ const f = await gh(`/repos/${REPO}/contents/${p}?t=${Date.now()}`); return f ? {data: JSON.parse(b64d(f.content)), sha: f.sha} : null; }
+async function saveConfig(msg){ const r = await gh(`/repos/${REPO}/contents/config/accounts.json`, {method:"PUT", body: JSON.stringify({message: msg, content: b64e(JSON.stringify(CFG, null, 2)+"\n"), sha: CFG_SHA})}); CFG_SHA = r.content.sha; }
+async function dispatch(wf, inputs){ await gh(`/repos/${REPO}/actions/workflows/${wf}/dispatches`, {method:"POST", body: JSON.stringify({ref:"main", inputs})}); }
+async function setSecret(name, value){
+  const sodium = (await import("https://esm.sh/libsodium-wrappers@0.7.13")).default;
+  await sodium.ready;
+  const k = await gh(`/repos/${REPO}/actions/secrets/public-key`);
+  const enc = sodium.crypto_box_seal(sodium.from_string(value), sodium.from_base64(k.key, sodium.base64_variants.ORIGINAL));
+  await gh(`/repos/${REPO}/actions/secrets/${name}`, {method:"PUT", body: JSON.stringify({encrypted_value: sodium.to_base64(enc, sodium.base64_variants.ORIGINAL), key_id: k.key_id})});
+}
+async function secretExists(name){ return !!(await gh(`/repos/${REPO}/actions/secrets/${name}`)); }
+function logout(){ store.del("pat"); PAT=null; show(); }
+
+function show(){ $("login").hidden = !!PAT; $("app").hidden = !PAT; $("topbtns").hidden = !PAT; }
+
+function render(){
+  const accs = CFG.accounts, st = (STATUS && STATUS.accounts) || {};
+  let pub=0, tot=0;
+  $("cards").innerHTML = accs.map(a => {
+    const s = st[a.slug] || {published:0,pending:0,percent:0,today:0,today_target:3,connected:{},errors:[]};
+    pub += s.published; tot += s.published + (s.pending||0);
+    const c = s.connected || {};
+    const errs = (s.errors||[]).slice(-2).map(e => `<div class="err">✗ ${e.file}: ${JSON.stringify(e.results).slice(0,140)}</div>`).join("");
+    return `<div class="card">
+      <div class="row" style="justify-content:space-between"><b>${a.name}</b><span class="big-pct">${s.percent}%</span></div>
+      <div class="bar"><i style="width:${s.percent}%"></i></div>
+      <div class="mut">${s.published} publicados · ${s.pending ?? "?"} pendientes · hoy ${s.today}/${s.today_target}</div>
+      <div class="row" style="margin:8px 0"><span class="pill ${c.instagram?'ok':'no'}">IG ${c.instagram?'✓':'✗'}</span><span class="pill ${c.youtube?'ok':'no'}">YT ${c.youtube?'✓':'✗'}</span>
+        <button class="btn ghost" style="padding:4px 10px;font-size:12px" onclick="connectIG('${a.slug}')">Conectar IG</button>
+        <button class="btn ghost" style="padding:4px 10px;font-size:12px" onclick="connectYT('${a.slug}')">Conectar YT</button></div>
+      ${errs}
+      <button class="btn" style="width:100%;margin-top:8px" onclick="subirYa('${a.slug}', this)">⚡ SUBIR YA</button>
+    </div>`;
+  }).join("");
+  const p = tot ? Math.round(100*pub/tot) : 0;
+  $("totPct").textContent = p + "%"; $("totBar").style.width = p + "%";
+  $("totTxt").textContent = `${pub} publicados de ${tot} (en todas las cuentas)`;
+  $("updated").textContent = STATUS ? "actualizado " + new Date(STATUS.updated_at).toLocaleString("es-AR") : "sin datos aún";
+
+  $("globalSlots").innerHTML = CFG.default_slots.map((t,i)=>`<input type="time" class="gs" value="${t}">`).join(" ");
+  $("slotRows").innerHTML = accs.map(a => `<div class="row" style="margin:6px 0"><span style="width:130px">${a.name}</span>${(a.slots||CFG.default_slots).map(t=>`<input type="time" class="as" data-slug="${a.slug}" value="${t}">`).join(" ")}
+     <label class="mut"><input type="checkbox" class="en" data-slug="${a.slug}" ${a.enabled!==false?'checked':''}> activa</label></div>`).join("");
+  $("ytClients").innerHTML = accs.map(a => `<div class="row" style="margin:8px 0"><span style="width:130px">${a.name}</span><textarea class="ytc" data-slug="${a.slug}" style="min-height:44px;flex:1" placeholder='{"web":{"client_id":"…"}}'></textarea><button class="btn" onclick="saveYT('${a.slug}')">Guardar</button><span class="mut">${a.youtube.client_id?'✓ cargado':''}</span></div>`).join("");
+  $("driveNow").textContent = CFG.drive_root_folder_id ? "Carpeta actual: " + CFG.drive_root_folder_id : "Sin carpeta de Drive (por ahora se usa la carpeta inbox/ del repo).";
+}
+
+async function load(){
+  try {
+    const c = await readFile("config/accounts.json"); CFG = c.data; CFG_SHA = c.sha;
+    const s = await readFile("state/status.json"); STATUS = s && s.data;
+    render(); loadRuns();
+    secretExists("TOKENS_KEY").then(x => $("keyState").textContent = x ? "✓ ya existe" : "falta");
+    gh(`/repos/${REPO}/actions/variables/YT_AUDITED`).then(v => $("audited").checked = v && v.value === "true");
+  } catch(e){ toast("Error: " + e.message, 8000); }
+}
+async function loadRuns(){
+  const r = await gh(`/repos/${REPO}/actions/runs?per_page=6`);
+  $("runs").innerHTML = (r.workflow_runs||[]).map(w => `<div>${w.status==="completed"?(w.conclusion==="success"?"✓":"✗"):"⏳"} ${w.name} · ${w.event} · ${new Date(w.created_at).toLocaleString("es-AR")} <a style="color:var(--lime)" target="_blank" href="${w.html_url}">ver</a></div>`).join("") || "—";
+}
+
+async function subirYa(slug, btn){
+  btn && (btn.disabled = true);
+  try { await dispatch("publish.yml", {mode:"now", account: slug}); toast(slug==="all" ? "Subiendo todo lo pendiente de todas las cuentas…" : "Subiendo todo lo pendiente de " + slug + "…"); setTimeout(loadRuns, 4000); }
+  catch(e){ toast("Error: " + e.message, 8000); }
+  btn && setTimeout(()=>btn.disabled=false, 5000);
+}
+window.subirYa = subirYa;
+
+function connectYT(slug){
+  const a = CFG.accounts.find(x=>x.slug===slug);
+  if (!a.youtube.client_id) return toast("Primero pegá el JSON del cliente OAuth de " + a.name + " (Conexiones → 4)");
+  const u = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  Object.entries({client_id:a.youtube.client_id, redirect_uri:REDIRECT, response_type:"code", access_type:"offline", prompt:"consent select_account",
+    scope:"https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly", state:"youtube:"+slug}).forEach(([k,v])=>u.searchParams.set(k,v));
+  location.href = u;
+}
+function connectIG(slug){
+  if (!CFG.ig_app_id) return toast("Primero guardá el app ID y secret de Instagram (Conexiones → 3)");
+  const u = new URL("https://www.instagram.com/oauth/authorize");
+  Object.entries({client_id:CFG.ig_app_id, redirect_uri:REDIRECT, response_type:"code", force_reauth:"true",
+    scope:"instagram_business_basic,instagram_business_content_publish", state:"instagram:"+slug}).forEach(([k,v])=>u.searchParams.set(k,v));
+  location.href = u;
+}
+window.connectYT = connectYT; window.connectIG = connectIG;
+
+async function saveYT(slug){
+  const ta = document.querySelector(`.ytc[data-slug="${slug}"]`);
+  try {
+    const j = JSON.parse(ta.value); const d = j.web || j.installed || j;
+    if (!d.client_id || !d.client_secret) throw new Error("JSON sin client_id/client_secret");
+    if (j.installed) toast("Ojo: ese cliente es de escritorio; para conectar desde el panel tiene que ser “Aplicación web”.", 8000);
+    await setSecret("YT_CLIENT_" + slug.toUpperCase(), JSON.stringify(j));
+    CFG.accounts.find(x=>x.slug===slug).youtube.client_id = d.client_id;
+    await saveConfig("cliente YouTube " + slug); ta.value=""; render(); toast("Cliente de YouTube guardado");
+  } catch(e){ toast("Error: " + e.message, 8000); }
+}
+window.saveYT = saveYT;
+
+async function handleCallback(){
+  const q = new URLSearchParams(location.search);
+  if (!q.get("code") || !q.get("state")) return;
+  const [platform, slug] = q.get("state").split(":");
+  history.replaceState(null, "", REDIRECT);
+  try { await dispatch("connect.yml", {platform, account: slug, code: q.get("code"), redirect_uri: REDIRECT});
+    toast(`Conectando ${platform} de ${slug}… en ~1 minuto aparece el ✓`, 9000); setTimeout(load, 60000); }
+  catch(e){ toast("Error: " + e.message, 9000); }
+}
+
+$("loginBtn").onclick = () => { PAT = $("pat").value.trim(); if(!PAT) return; store.set("pat", PAT); show(); handleCallback(); load(); };
+$("logout").onclick = logout;
+$("refresh").onclick = load;
+$("nowAll").onclick = e => { if (confirm("¿Subir YA todo lo pendiente de TODAS las cuentas?")) subirYa("all", e.target); };
+$("applyAll").onclick = () => {
+  const g = [...document.querySelectorAll(".gs")].map(i=>i.value);
+  const add = (t,m) => { let [h,mm]=t.split(":").map(Number); let x=(h*60+mm+m)%1440; return String(Math.floor(x/60)).padStart(2,"0")+":"+String(x%60).padStart(2,"0"); };
+  CFG.default_slots = g;
+  CFG.accounts.forEach((a,i)=> a.slots = g.map(t=>add(t, $("stagger").checked ? i*10 : 0)));
+  render(); toast("Aplicado. Tocá “Guardar horarios”.");
+};
+$("saveSlots").onclick = async () => {
+  CFG.default_slots = [...document.querySelectorAll(".gs")].map(i=>i.value);
+  CFG.accounts.forEach(a => { a.slots = [...document.querySelectorAll(`.as[data-slug="${a.slug}"]`)].map(i=>i.value).filter(Boolean);
+    a.enabled = document.querySelector(`.en[data-slug="${a.slug}"]`).checked; });
+  try { await saveConfig("horarios desde el panel"); toast("Horarios guardados ✓"); } catch(e){ toast("Error: "+e.message, 8000); }
+};
+$("saveSa").onclick = async () => {
+  try { const j = JSON.parse($("saJson").value); if (j.type!=="service_account") throw new Error("No es un JSON de cuenta de servicio");
+    await setSecret("GOOGLE_SA_JSON", JSON.stringify(j)); CFG.service_account_email = j.client_email; await saveConfig("cuenta de servicio");
+    $("saJson").value=""; $("saEmail").textContent = "Compartí la carpeta con: " + j.client_email; toast("Cuenta de servicio guardada ✓"); }
+  catch(e){ toast("Error: "+e.message, 8000); }
+};
+$("saveDrive").onclick = async () => {
+  const m = $("driveLink").value.match(/folders\/([\w-]+)/) || $("driveLink").value.match(/^([\w-]{20,})$/);
+  if (!m) return toast("Link de carpeta inválido");
+  CFG.drive_root_folder_id = m[1];
+  try { await saveConfig("carpeta de Drive"); render(); toast("Carpeta guardada ✓"); } catch(e){ toast("Error: "+e.message, 8000); }
+};
+$("genKey").onclick = async () => {
+  if ($("keyState").textContent.includes("ya existe") && !confirm("Ya existe una clave. Si la cambiás, hay que reconectar todas las cuentas. ¿Seguir?")) return;
+  const raw = crypto.getRandomValues(new Uint8Array(32));
+  const key = btoa(String.fromCharCode(...raw)).replace(/\+/g,"-").replace(/\//g,"_");
+  try { await setSecret("TOKENS_KEY", key); $("keyState").textContent = "✓ ya existe"; toast("Clave generada y guardada ✓"); } catch(e){ toast("Error: "+e.message, 8000); }
+};
+$("saveIg").onclick = async () => {
+  const id = $("igId").value.trim(), sec = $("igSecret").value.trim();
+  if (!id || !sec) return toast("Completá los dos campos");
+  try { await setSecret("IG_APP_ID", id); await setSecret("IG_APP_SECRET", sec); CFG.ig_app_id = id; await saveConfig("app de Instagram");
+    $("igSecret").value=""; toast("Instagram guardado ✓"); } catch(e){ toast("Error: "+e.message, 8000); }
+};
+$("saveAud").onclick = async () => {
+  const v = $("audited").checked ? "true" : "false";
+  try { const ex = await gh(`/repos/${REPO}/actions/variables/YT_AUDITED`);
+    await gh(`/repos/${REPO}/actions/variables${ex?"/YT_AUDITED":""}`, {method: ex?"PATCH":"POST", body: JSON.stringify({name:"YT_AUDITED", value:v})});
+    toast("Guardado ✓"); } catch(e){ toast("Error: "+e.message, 8000); }
+};
+$("ruri1").textContent = REDIRECT; $("ruri2").textContent = REDIRECT;
+
+show();
+if (PAT) { handleCallback(); load(); setInterval(()=>{ if(!document.hidden) load(); }, 60000); }
+</script>
+</body>
+</html>
