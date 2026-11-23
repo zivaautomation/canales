@@ -42,10 +42,18 @@ input[type=time]{width:105px}textarea{width:100%;min-height:80px;font-family:ui-
 <main>
 <section id="login" class="card" hidden>
   <h2>Entrar</h2>
-  <p class="mut">Pegá tu token de GitHub (fine-grained, repo <b>zivaautomation/social-publisher</b>, permisos: Contents, Actions, Secrets y Variables en <i>Read and write</i>). Se guarda solo en este navegador.</p>
-  <input id="pat" type="password" placeholder="github_pat_…" style="width:100%">
-  <p><button class="btn" id="loginBtn">Entrar</button></p>
-  <p class="mut"><a style="color:var(--lime)" target="_blank" href="https://github.com/settings/personal-access-tokens/new">Crear token →</a></p>
+  <div id="pwBox">
+    <input id="pw" type="password" placeholder="Contraseña" style="width:100%">
+    <p><button class="btn" id="pwBtn">Entrar</button></p>
+    <p class="mut"><a href="#" style="color:var(--lime)" id="showSetup">Primera vez / cambiar contraseña</a></p>
+  </div>
+  <div id="setupBox" hidden>
+    <p class="mut">Solo la primera vez: pegá el token de GitHub (repos <b>social-publisher</b> y <b>canales</b>; permisos Contents, Actions, Secrets y Variables en <i>Read and write</i>) y elegí una contraseña. Después entrás desde cualquier dispositivo solo con la contraseña.</p>
+    <input id="pat" type="password" placeholder="github_pat_…" style="width:100%;margin-bottom:8px">
+    <input id="newPw" type="password" placeholder="Contraseña nueva (mínimo 10 caracteres)" style="width:100%;margin-bottom:8px">
+    <input id="newPw2" type="password" placeholder="Repetir contraseña" style="width:100%">
+    <p><button class="btn" id="setupBtn">Guardar y entrar</button></p>
+  </div>
 </section>
 
 <div id="app" hidden>
@@ -223,7 +231,33 @@ async function handleCallback(){
   catch(e){ toast("Error: " + e.message, 9000); }
 }
 
-$("loginBtn").onclick = () => { PAT = $("pat").value.trim(); if(!PAT) return; store.set("pat", PAT); show(); handleCallback(); load(); };
+const KEYFILE = "https://api.github.com/repos/zivaautomation/canales/contents/panel/acceso.json";
+async function kdf(pw, salt){ const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:600000, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]); }
+const u8 = b => Uint8Array.from(atob(b), c=>c.charCodeAt(0)), tb = a => btoa(String.fromCharCode(...new Uint8Array(a)));
+function enter(){ store.set("pat", PAT); show(); handleCallback(); load(); }
+$("showSetup").onclick = e => { e.preventDefault(); $("setupBox").hidden = false; $("pwBox").hidden = true; };
+$("pw").onkeydown = e => { if (e.key === "Enter") $("pwBtn").click(); };
+$("pwBtn").onclick = async () => {
+  try { const r = await fetch("acceso.json?t=" + Date.now()); if (!r.ok) throw new Error("Todavía no hay contraseña: usá “Primera vez”.");
+    const j = await r.json(); const key = await kdf($("pw").value, u8(j.salt));
+    PAT = new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM", iv:u8(j.iv)}, key, u8(j.data))); enter(); }
+  catch(e){ toast(e.name === "OperationError" ? "Contraseña incorrecta" : e.message, 6000); }
+};
+$("setupBtn").onclick = async () => {
+  const pat = $("pat").value.trim(), pw = $("newPw").value;
+  if (!pat) return toast("Pegá el token"); if (pw.length < 10) return toast("La contraseña debe tener al menos 10 caracteres");
+  if (pw !== $("newPw2").value) return toast("Las contraseñas no coinciden");
+  try { const salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12));
+    const data = await crypto.subtle.encrypt({name:"AES-GCM", iv}, await kdf(pw, salt), new TextEncoder().encode(pat));
+    const body = JSON.stringify({salt: tb(salt), iv: tb(iv), data: tb(data)});
+    const h = {"Authorization":"Bearer "+pat, "Accept":"application/vnd.github+json"};
+    const ex = await fetch(KEYFILE, {headers:h}); const sha = ex.ok ? (await ex.json()).sha : undefined;
+    const r = await fetch(KEYFILE, {method:"PUT", headers:h, body: JSON.stringify({message:"acceso del panel", content: btoa(body), sha})});
+    if (!r.ok) throw new Error("El token no puede escribir en el repo canales (" + r.status + ")");
+    PAT = pat; enter(); toast("Contraseña guardada ✓ (tarda ~1 min en funcionar en otros dispositivos)", 7000); }
+  catch(e){ toast("Error: " + e.message, 8000); }
+};
 $("logout").onclick = logout;
 $("refresh").onclick = load;
 $("nowAll").onclick = e => { if (confirm("¿Subir YA todo lo pendiente de TODAS las cuentas?")) subirYa("all", e.target); };
