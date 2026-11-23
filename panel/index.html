@@ -239,8 +239,8 @@ function enter(){ store.set("pat", PAT); show(); handleCallback(); load(); }
 $("showSetup").onclick = e => { e.preventDefault(); $("setupBox").hidden = false; $("pwBox").hidden = true; };
 $("pw").onkeydown = e => { if (e.key === "Enter") $("pwBtn").click(); };
 $("pwBtn").onclick = async () => {
-  try { const r = await fetch("acceso.json?t=" + Date.now()); if (!r.ok) throw new Error("Todavía no hay contraseña: usá “Primera vez”.");
-    const j = await r.json(); const key = await kdf($("pw").value, u8(j.salt));
+  try { let j = null; const loc = store.get("acceso"); if (loc) j = JSON.parse(loc);
+    if (!j) { const r = await fetch("acceso.json?t=" + Date.now()); if (!r.ok) throw new Error("Todavía no hay contraseña en este dispositivo: usá “Primera vez”."); j = await r.json(); } const key = await kdf($("pw").value, u8(j.salt));
     PAT = new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM", iv:u8(j.iv)}, key, u8(j.data))); enter(); }
   catch(e){ toast(e.name === "OperationError" ? "Contraseña incorrecta" : e.message, 6000); }
 };
@@ -257,8 +257,9 @@ $("setupBtn").onclick = async () => {
     const h = {"Authorization":"Bearer "+pat, "Accept":"application/vnd.github+json"};
     const ex = await fetch(KEYFILE, {headers:h}); const sha = ex.ok ? (await ex.json()).sha : undefined;
     const r = await fetch(KEYFILE, {method:"PUT", headers:h, body: JSON.stringify({message:"acceso del panel", content: btoa(body), sha})});
-    if (!r.ok) throw new Error("El token no puede escribir en el repo canales (" + r.status + ")");
-    PAT = pat; enter(); toast("Contraseña guardada ✓ (tarda ~1 min en funcionar en otros dispositivos)", 7000); }
+    store.set("acceso", body);
+    PAT = pat; enter();
+    toast(r.ok ? "Contraseña guardada ✓ (funciona en cualquier dispositivo en ~1 min)" : "Contraseña guardada en este dispositivo ✓ (en otro dispositivo repetí “Primera vez”)", 8000); }
   catch(e){ toast("Error: " + e.message, 8000); }
 };
 $("logout").onclick = logout;
