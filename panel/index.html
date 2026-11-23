@@ -171,7 +171,9 @@ function render(){
 
 async function load(){
   try {
-    const c = await readFile("config/accounts.json"); CFG = c.data; CFG_SHA = c.sha;
+    const c = await readFile("config/accounts.json");
+    if (!c) { const me = await gh("/user"); throw new Error(`El token (cuenta ${me && me.login}) no tiene acceso al repo social-publisher. Tiene que ser de la cuenta zivaautomation e incluir ese repo.`); }
+    CFG = c.data; CFG_SHA = c.sha;
     const s = await readFile("state/status.json"); STATUS = s && s.data;
     render(); loadRuns();
     secretExists("TOKENS_KEY").then(x => $("keyState").textContent = x ? "✓ ya existe" : "falta");
